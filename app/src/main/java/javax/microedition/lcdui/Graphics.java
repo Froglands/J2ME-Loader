@@ -55,6 +55,8 @@ public class Graphics implements
 
 	private final Canvas canvas;
 	private final Image image;
+	/** Kelipatan resolusi bitmap target (1 = normal). Canvas sudah di-scale sebesar ini. */
+	private final int scale;
 
 	private final Paint drawPaint = new Paint();
 	private final Paint fillPaint = new Paint();
@@ -74,7 +76,13 @@ public class Graphics implements
 
 	Graphics(Image image) {
 		this.image = image;
+		this.scale = image.getScale();
 		canvas = new Canvas(image.getBitmap());
+		if (scale != 1) {
+			// semua koordinat game tetap logis; skala dipasang SEBELUM save() pertama
+			// supaya restoreToCount(1) di reset()/setClip() tidak menghilangkannya
+			canvas.scale(scale, scale);
+		}
 		canvas.save();
 		canvas.clipRect(image.getBounds());
 		canvas.getClipBounds(clip);
@@ -379,7 +387,12 @@ public class Graphics implements
 			ly = y;
 		}
 
-		canvas.drawBitmap(image.getBitmap(), lx, ly, null);
+		if (scale == 1 && image.getScale() == 1) {
+			canvas.drawBitmap(image.getBitmap(), lx, ly, null);
+		} else {
+			rectF.set(lx, ly, lx + image.getWidth(), ly + image.getHeight());
+			canvas.drawBitmap(image.getBitmap(), image.getBitmapBounds(), rectF, null);
+		}
 	}
 
 	public void drawSubstring(String str, int offset, int len, int x, int y, int anchor) {
@@ -415,7 +428,8 @@ public class Graphics implements
 		RectF dstR = rectF;
 		float dx;
 		float dy;
-		srcR.set(x_src, y_src, x_src + width, y_src + height);
+		int is = image.getScale();
+		srcR.set(x_src * is, y_src * is, (x_src + width) * is, (y_src + height) * is);
 
 		Matrix matrix = new Matrix();
 		switch (transform) {
@@ -540,6 +554,18 @@ public class Graphics implements
 	public void copyArea(int x_src, int y_src, int width, int height,
 						 int x_dest, int y_dest, int anchor) {
 		if (width <= 0 || height <= 0) return;
+		if (scale != 1) {
+			// target HD: salin blok piksel scale x scale, lalu gambar ke area logis tujuan
+			Bitmap part = Bitmap.createBitmap(image.getBitmap(), x_src * scale, y_src * scale,
+					width * scale, height * scale);
+			float hx = (anchor & Graphics.RIGHT) != 0 ? x_dest - width
+					: (anchor & Graphics.HCENTER) != 0 ? x_dest - width / 2.0f : x_dest;
+			float hy = (anchor & Graphics.BOTTOM) != 0 ? y_dest - height
+					: (anchor & Graphics.VCENTER) != 0 ? y_dest - height / 2.0f : y_dest;
+			rectF.set(hx, hy, hx + width, hy + height);
+			canvas.drawBitmap(part, null, rectF, null);
+			return;
+		}
 		final int[] pixels = new int[width * height];
 		image.getBitmap().getPixels(pixels, 0, width, x_src, y_src, width, height);
 		float dx;
@@ -564,6 +590,17 @@ public class Graphics implements
 	public void getPixels(int[] pixels, int offset, int stride,
 						  int x, int y, int width, int height) {
 		Bitmap b = image.getBitmap();
+		if (scale != 1) {
+			int half = scale / 2;
+			int w = Math.min(width, b.getWidth() / scale - x);
+			int h = Math.min(height, b.getHeight() / scale - y);
+			for (int r = 0; r < h; r++) {
+				for (int c = 0; c < w; c++) {
+					pixels[offset + r * stride + c] = b.getPixel((x + c) * scale + half, (y + r) * scale + half);
+				}
+			}
+			return;
+		}
 		int w = Math.min(width, b.getWidth() - x);
 		int h = Math.min(height, b.getHeight() - y);
 		b.getPixels(pixels, offset, stride, x, y, w, h);
@@ -575,7 +612,13 @@ public class Graphics implements
 
 	void flush(Image image, int x, int y, int width, int height) {
 		rect.set(x, y, x + width, y + height);
-		canvas.drawBitmap(image.getBitmap(), rect, rect, null);
+		int is = image.getScale();
+		if (is == 1) {
+			canvas.drawBitmap(image.getBitmap(), rect, rect, null);
+		} else {
+			Rect src = new Rect(x * is, y * is, (x + width) * is, (y + height) * is);
+			canvas.drawBitmap(image.getBitmap(), src, rect, null);
+		}
 	}
 
 	@Override

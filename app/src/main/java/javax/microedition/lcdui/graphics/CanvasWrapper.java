@@ -76,7 +76,7 @@ public class CanvasWrapper {
 	public void drawImage(Image image, RectF dst) {
 		Bitmap bitmap = image.getBitmap();
 		bitmap.prepareToDraw();
-		canvas.drawBitmap(bitmap, image.getBounds(), dst, imgPaint);
+		canvas.drawBitmap(bitmap, image.getBitmapBounds(), dst, imgPaint);
 	}
 
 	public void drawBitmap(Bitmap bitmap, Rect src, RectF dst) {

@@ -319,8 +319,9 @@ public abstract class Canvas extends Displayable {
 			Bitmap bitmap;
 			if (screenshotRawMode) {
 				synchronized (bufferLock) {
+					android.graphics.Rect px = offscreenCopy.getBitmapBounds();
 					bitmap = Bitmap.createBitmap(offscreenCopy.getBitmap(), 0, 0,
-							offscreenCopy.getWidth(), offscreenCopy.getHeight());
+							px.right, px.bottom);
 				}
 			} else {
 				bitmap = Bitmap.createBitmap(onWidth, onHeight, Bitmap.Config.ARGB_8888);
@@ -494,8 +495,8 @@ public abstract class Canvas extends Displayable {
 			float gt = 1.0f - 2.0f * virtualScreen.top / displayHeight;
 			float gr = 2.0f * virtualScreen.right / displayWidth - 1.0f;
 			float gb = 1.0f - 2.0f * virtualScreen.bottom / displayHeight;
-			float th = (float) height / offscreen.getBitmap().getHeight();
-			float tw = (float) width / offscreen.getBitmap().getWidth();
+			float th = (float) offscreen.getBitmapBounds().height() / offscreen.getBitmap().getHeight();
+			float tw = (float) offscreen.getBitmapBounds().width() / offscreen.getBitmap().getWidth();
 			renderer.updateSize(gl, gt, gr, gb, th, tw);
 		}
 		repaintInternal();
